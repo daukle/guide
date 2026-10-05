@@ -4,7 +4,9 @@ import { pathToFileURL } from "node:url";
 import { gather } from "./fetch.mjs";
 import { renderMarkdown, page, escapeHtml } from "./render.mjs";
 
-const BASE = process.env.SITE_BASE ?? "";
+// The site publishes at daukle.github.io/guide/, so every link is prefixed unless a
+// local build overrides it.
+const BASE = process.env.SITE_BASE ?? "/guide";
 const OUT = process.env.SITE_OUT ?? "site";
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
