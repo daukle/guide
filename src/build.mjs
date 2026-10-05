@@ -60,9 +60,11 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
   }
 
   const pages = guidePages();
+  const exampleCount = subjects.reduce(
+    (total, subject) => total + (subject.exampleDetails || []).length, 0);
   const groups = [
     ["The guide", pages.map((p) => ({ href: `/guide/${p.slug}/`, label: titleOf(p.text, p.slug) }))],
-    ["Plugins", subjects.filter((s) => s.kind !== "core").map((s) => ({
+    ["Plugins", subjects.filter((s) => !["core", "examples"].includes(s.kind)).map((s) => ({
       href: `/plugins/${s.id}/`,
       label: s.id,
       note: s.kind,
@@ -70,6 +72,7 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
     ["Core", subjects.filter((s) => s.kind === "core").map((s) => ({
       href: `/core/`, label: s.id, note: s.release ? s.release.tag : "unreleased",
     }))],
+    ["Everything else", [{ href: "/examples/", label: "Examples", note: String(exampleCount) }]],
   ];
   const nav = navigation(groups, base);
 
@@ -82,7 +85,9 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
   }
 
   for (const subject of subjects) {
-    const prefix = subject.kind === "core" ? ["core"] : ["plugins", subject.id];
+    const prefix = subject.kind === "core" ? ["core"]
+      : subject.kind === "examples" ? ["examples", "about"]
+      : ["plugins", subject.id];
     for (const wikiPage of subject.pages) {
       const isIndex = wikiPage.name === "index.md";
       const slug = wikiPage.name.replace(/\.md$/, "");
@@ -95,6 +100,14 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
       written += 1;
     }
   }
+
+  write(join(out, "examples", "index.html"), page({
+    title: "Examples",
+    body: examplesBody(subjects, base),
+    nav,
+    base,
+  }));
+  written += 1;
 
   write(join(out, "index.html"), page({
     title: "daukle",
@@ -122,8 +135,47 @@ function subjectHeader(subject, base) {
          `${release}${examples}</p>`;
 }
 
+/**
+ * Every example in the organization, grouped by the repository that owns it.
+ *
+ * @implNote this is an INDEX and not a copy. An example lives in its plugin's
+ * own repository so that plugin's CI breaks when the example stops working,
+ * which is the whole property a central copy would give up.
+ */
+function examplesBody(subjects, base) {
+  const sections = subjects
+    .filter((subject) => (subject.exampleDetails || []).length > 0)
+    .map((subject) => {
+      const rows = subject.exampleDetails.map((example) =>
+        `<tr><td><a href="${example.url}">${escapeHtml(example.name)}</a></td>` +
+        `<td>${escapeHtml(example.summary)}</td></tr>`).join("");
+      const heading = subject.kind === "core" ? subject.id
+        : `<a href="${base}/plugins/${subject.id}/">${escapeHtml(subject.id)}</a>`;
+      return `<h2>${heading}</h2>` +
+             `<table><thead><tr><th>example</th><th>what it shows</th></tr></thead>` +
+             `<tbody>${rows}</tbody></table>`;
+    });
+
+  const without = subjects.filter((subject) => (subject.exampleDetails || []).length === 0)
+    .map((subject) => subject.id);
+  const note = without.length
+    ? `<p class="meta">No example yet: ${escapeHtml(without.join(", "))}. A source or a ` +
+      `dependency writer needs a second plugin to demonstrate anything, so its example is ` +
+      `cross-plugin and lives in <a href="https://github.com/daukle/examples">daukle/examples</a>.</p>`
+    : "";
+
+  return `<h1>Examples</h1>
+<p>Every example in the organization. Each one lives in the repository it demonstrates, so that
+repository's own CI breaks when the example stops working, and each carries an ABOUT.md with a
+<strong>what this cannot show</strong> section. The cross-plugin ones, which need two plugins to
+demonstrate anything, live in
+<a href="https://github.com/daukle/examples">daukle/examples</a>.</p>
+${sections.join("")}
+${note}`;
+}
+
 function indexBody(manifest, subjects, base) {
-  const rows = subjects.filter((s) => s.kind !== "core").map((s) =>
+  const rows = subjects.filter((s) => !["core", "examples"].includes(s.kind)).map((s) =>
     `<tr><td><a href="${base}/plugins/${s.id}/">${escapeHtml(s.id)}</a></td>` +
     `<td>${escapeHtml(s.kind)}</td>` +
     `<td>${s.release ? escapeHtml(s.release.tag) : "unreleased"}</td>` +

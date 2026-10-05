@@ -56,16 +56,57 @@ export async function readWiki(repo, ref, options) {
   return pages;
 }
 
+/**
+ * The first prose sentence of an ABOUT.md, which is what an example calls
+ * itself. Headings and bold-only lines are skipped: an ABOUT.md opens with a
+ * title and often a bold claim, and neither is the description.
+ */
+export function summarise(about) {
+  for (const block of about.split(/\n{2,}/)) {
+    const line = block.trim();
+    if (!line || line.startsWith("#") || line.startsWith("|") || line.startsWith("```")) continue;
+    const plain = line.replace(/\*\*/g, "").replace(/\s+/g, " ");
+    const sentence = plain.match(/^(.+?[.!?])(\s|$)/);
+    return sentence ? sentence[1] : plain;
+  }
+  return "";
+}
+
+async function readExamples(subject, options) {
+  const out = [];
+  for (const name of subject.examples || []) {
+    // An example lives in the plugin's OWN repository so that plugin's CI
+    // breaks when it stops working. This only indexes them; nothing is copied
+    // here and nothing is re-run.
+    // daukle/examples keeps its examples at the ROOT; everywhere else they are
+    // under examples/. The manifest records the names either way.
+    const prefix = subject.kind === "examples" ? "" : "examples/";
+    const about = await options.fetchImpl(
+      `https://raw.githubusercontent.com/${subject.repo}/${subject.defaultBranch}` +
+      `/${prefix}${name}/ABOUT.md`,
+      { headers: { "user-agent": "daukle-guide" } });
+    out.push({
+      name,
+      url: `https://github.com/${subject.repo}/tree/${subject.defaultBranch}/${prefix}${name}`,
+      summary: about.ok ? summarise(await about.text()) : "",
+    });
+  }
+  return out;
+}
+
 export async function gather({ token, fetchImpl = fetch, manifestUrl } = {}) {
   const manifest = await readManifest({ url: manifestUrl, token, fetchImpl });
   const options = { token, fetchImpl };
 
-  const subjects = [manifest.core, ...manifest.plugins].filter(Boolean);
+  // The examples repository is a subject too: it holds every CROSS-plugin example,
+  // which by definition belongs to no single plugin.
+  const subjects = [manifest.core, ...manifest.plugins, manifest.examples].filter(Boolean);
   const out = [];
   for (const subject of subjects) {
     out.push({
       ...subject,
       pages: await readWiki(subject.repo, subject.defaultBranch, options),
+      exampleDetails: await readExamples(subject, options),
     });
   }
   return { manifest, subjects: out };
