@@ -20,31 +20,37 @@ export async function readManifest({ url = MANIFEST, token, fetchImpl = fetch } 
   if (!response.ok) {
     throw new Error(`the manifest answered ${response.status}; the site would have no plugins`);
   }
-  return response.json();
-}
+  const manifest = await response.json();
 
-async function listWikiPages(repo, ref, { token, fetchImpl }) {
-  const response = await fetchImpl(
-    `https://api.github.com/repos/${repo}/contents/wiki?ref=${ref}`,
-    { headers: { ...headers(token), accept: "application/vnd.github+json" } });
-  if (!response.ok) return [];
-  const entries = await response.json();
-  if (!Array.isArray(entries)) return [];
-  return entries
-    .filter((entry) => entry.type === "file" && entry.name.endsWith(".md"))
-    .map((entry) => entry.name);
+  // raw.githubusercontent is CDN cached for a few minutes, so a build run
+  // straight after a manifest push reads the PREVIOUS one. Checking the shape
+  // turns that into "the manifest is older than this build expects" rather than
+  // "no repository carries a wiki", which is what it looked like twice before
+  // this check existed.
+  const subjects = [manifest.core, ...(manifest.plugins || [])].filter(Boolean);
+  if (subjects.length > 0 && subjects.every((s) => s.wikiPages === undefined)) {
+    throw new Error(
+      "the manifest carries no wikiPages field, so it predates this build. " +
+      "raw.githubusercontent caches for a few minutes after a push; wait and retry.");
+  }
+  return manifest;
 }
 
 /**
  * Every wiki page of one repository, as { name, text }.
  *
- * A repository with no wiki/ answers with an empty list rather than an error:
- * a plugin that has not written one yet is a gap in the site, not a reason for
- * the build to fail. How many such gaps are tolerable is the caller's call,
- * which is what `maxMissing` in build.mjs is for.
+ * @implNote the page NAMES come from the manifest rather than from a directory
+ * listing, and that is what keeps this build off the GitHub API entirely. The
+ * contents API is rate limited to 60 an hour unauthenticated and shared across
+ * the whole runner IP pool, which this organization has already been bitten by;
+ * raw.githubusercontent is not. The manifest is generated with a token, so the
+ * one place that must list a directory is the one place that has one.
+ *
+ * A repository with no wiki/ yields an empty list rather than an error: a plugin
+ * that has not written one is a gap in the site, not a reason to fail. How many
+ * gaps are tolerable is build.mjs's call.
  */
-export async function readWiki(repo, ref, options) {
-  const names = await listWikiPages(repo, ref, options);
+export async function readWiki(repo, ref, names, options) {
   const pages = [];
   for (const name of names) {
     const response = await options.fetchImpl(
@@ -105,7 +111,8 @@ export async function gather({ token, fetchImpl = fetch, manifestUrl } = {}) {
   for (const subject of subjects) {
     out.push({
       ...subject,
-      pages: await readWiki(subject.repo, subject.defaultBranch, options),
+      pages: await readWiki(subject.repo, subject.defaultBranch,
+                            subject.wikiPages || [], options),
       exampleDetails: await readExamples(subject, options),
     });
   }
