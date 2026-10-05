@@ -1,0 +1,9 @@
+{
+  "name": "@daukle/guide",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "docs": "node src/build.mjs"
+  }
+}

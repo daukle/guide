@@ -1,0 +1,27 @@
+name: Wiki site
+
+# The site is built from daukle/manifest plus every repository's wiki/, so it is
+# rebuilt on a schedule as well as on a push: a plugin that adds a page should
+# appear here without anyone touching this repository.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  site:
+    uses: intisy/workflows/.github/workflows/docs.yml@main
+    with:
+      install: 'echo "no dependencies: that is the point"'
+      build: ''
+      docs: 'npm run docs'
+      site_dir: 'site'
+    secrets:
+      envPAT: ${{ secrets.PAT }}
