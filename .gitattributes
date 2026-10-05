@@ -1,0 +1,5 @@
+# The npm example compares a package.json daukle wrote against a checked-in
+# expectation, byte for byte, and what daukle writes is LF on every platform.
+# Letting core.autocrlf rewrite a checkout would fail that comparison on
+# Windows for a reason that has nothing to do with daukle.
+* -text

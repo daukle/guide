@@ -1,0 +1,8 @@
+# The daukle checkout the harness builds against, at the ROOT only. Unanchored this matches
+# at every depth, and it silently swallowed wrapper-bootstrap/.daukle/wrapper.toml: present
+# locally, absent from a clone, and the wrapper then reports a missing pin file in CI alone.
+# `build/` is left unanchored on purpose, because no example here keeps a tracked build/.
+/.daukle/
+test/.work/
+build/
+node_modules/

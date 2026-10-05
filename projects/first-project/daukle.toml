@@ -1,0 +1,34 @@
+schema = 1
+project = "example/first-project"
+version = "1.0.0"
+
+[modules]
+
+# Where a dependency comes from. daukle/path reads <path>/daukle.toml, which is
+# the shape to use while a producer publishes no release of its own.
+[sources."example/greeter"]
+kind = "path"
+path = "./producer"
+
+# How daukle fetches a plugin. A resolver turns "owner/name@range" into a url,
+# and this one is pinned by digest so the fetch cannot change under you.
+[resolvers.github]
+url = "https://raw.githubusercontent.com/daukle/daukle/f9055f9a07011283009675f4ffbc0a9b783c50bd/plugins/github-releases.lua"
+sha256 = "3789865c266eb53fafcf7300d77a24461170c615195d92d0ddf88078c556e23e"
+
+# daukle itself knows no languages. Everything it can do arrives here.
+[plugins]
+path = { resolver = "github", coordinate = "daukle/path@^1.0.0" }
+npm = { resolver = "github", coordinate = "daukle/npm@^1.0.0" }
+
+# A consumer is a file daukle keeps in step with the manifest. daukle owns the
+# lines it wrote and leaves everything else in the file alone.
+[[consumers]]
+id = "node"
+language = "npm"
+file = "package.json"
+configuration = "dependencies"
+
+  [consumers.dependencies."example/greeter"]
+  version = "^2.0.0"
+  modules = ["cli"]
