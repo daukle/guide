@@ -14,6 +14,15 @@ on:
     - cron: '17 5 * * *'
   workflow_dispatch:
 
+# A called workflow's permissions are INTERSECTED with the caller's, so these have
+# to be granted here even though docs.yml asks for them itself. Omitting them is a
+# startup_failure with no log at all, which reads exactly like the secrets mistake
+# that preceded it.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   site:
     uses: intisy/workflows/.github/workflows/docs.yml@main
