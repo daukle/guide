@@ -20,7 +20,6 @@ function indexOf(subjects) {
 
 function subjectHref(subject, base) {
   if (subject.kind === "core") return `${base}/core/`;
-  if (subject.kind === "examples") return `${base}/examples/about/`;
   return `${base}/plugins/${subject.id}/`;
 }
 

@@ -137,11 +137,8 @@ async function readExamples(subject, options) {
     // An example lives in the plugin's OWN repository so that plugin's CI
     // breaks when it stops working. This only indexes them; nothing is copied
     // here and nothing is re-run.
-    // daukle/examples keeps its examples at the ROOT; everywhere else they are
-    // under examples/. The manifest records the names either way.
-    const prefix = subject.kind === "examples" ? "" : "examples/";
     const root = `https://raw.githubusercontent.com/${subject.repo}/${subject.defaultBranch}` +
-                 `/${prefix}${name}`;
+                 `/examples/${name}`;
     const about = await options.fetchImpl(`${root}/ABOUT.md`,
       { headers: { "user-agent": "daukle-guide" } });
     const aboutText = about.ok ? await about.text() : "";
@@ -150,7 +147,7 @@ async function readExamples(subject, options) {
       repo: subject.repo,
       about: aboutText,
       contents: await readExampleFiles(root, files || [], options),
-      url: `https://github.com/${subject.repo}/tree/${subject.defaultBranch}/${prefix}${name}`,
+      url: `https://github.com/${subject.repo}/tree/${subject.defaultBranch}/examples/${name}`,
       summary: aboutText ? summarise(aboutText) : "",
     });
   }
@@ -161,9 +158,7 @@ export async function gather({ token, fetchImpl = fetch, manifestUrl } = {}) {
   const manifest = await readManifest({ url: manifestUrl, token, fetchImpl });
   const options = { token, fetchImpl };
 
-  // The examples repository is a subject too: it holds every CROSS-plugin example,
-  // which by definition belongs to no single plugin.
-  const subjects = [manifest.core, ...manifest.plugins, manifest.examples].filter(Boolean);
+  const subjects = [manifest.core, ...manifest.plugins].filter(Boolean);
   const out = [];
   for (const subject of subjects) {
     out.push({
