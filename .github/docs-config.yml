@@ -1,0 +1,2 @@
+kind: generic
+description: The renderer for the daukle organization's documentation site. It holds no content of its own: every page comes from some repository's wiki/ and every example from some repository's examples/, and this builds them into https://daukle.github.io/guide/.

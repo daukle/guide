@@ -1,8 +1,8 @@
 ## What this is
 
-The developer guide for daukle, **and the wiki site for the whole organization**. It is two things
-in one repository because they share a build: four hand-written pages, each built on a project here
-that actually runs, plus every plugin's own wiki page, collected from every repository in the org.
+The **renderer** for the daukle organization's documentation site, and nothing else. It holds no
+pages and no examples of its own: every page comes from some repository's `wiki/` and every example
+from that repository's `examples/`, and this build collects them into one site.
 
 | page | what it answers | where it lives |
 | --- | --- | --- |
