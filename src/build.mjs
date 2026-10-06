@@ -100,7 +100,7 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
     (total, subject) => total + (subject.exampleDetails || []).length, 0);
   const groups = [
     ["The guide", pages.map((p) => ({ href: `/core/${p.slug}/`, label: titleOf(p.text, p.slug) }))],
-    ["Plugins", subjects.filter((s) => !["core", "examples"].includes(s.kind)).map((s) => ({
+    ["Plugins", subjects.filter((s) => s.kind !== "core").map((s) => ({
       href: `/plugins/${s.id}/`,
       label: s.id,
       note: s.kind,
@@ -114,9 +114,7 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
 
   let written = 0;
   for (const subject of subjects) {
-    const prefix = subject.kind === "core" ? ["core"]
-      : subject.kind === "examples" ? ["examples", "about"]
-      : ["plugins", subject.id];
+    const prefix = subject.kind === "core" ? ["core"] : ["plugins", subject.id];
     for (const wikiPage of subject.pages) {
       const isIndex = wikiPage.name === "index.md";
       const slug = wikiPage.name.replace(/\.md$/, "");
@@ -259,7 +257,7 @@ function exampleBody(example, subject, base) {
         `<a href="${example.url}/${file.path}">${escapeHtml(file.path)}</a>`).join(", ")}.</p>`
     : "";
 
-  const owner = subject.kind === "core" || subject.kind === "examples"
+  const owner = subject.kind === "core"
     ? escapeHtml(subject.id)
     : `<a href="${base}/plugins/${subject.id}/">${escapeHtml(subject.id)}</a>`;
 
@@ -292,7 +290,7 @@ release is a choice until somebody decides otherwise.</p>
 }
 
 function indexBody(manifest, subjects, base) {
-  const rows = subjects.filter((s) => !["core", "examples"].includes(s.kind)).map((s) =>
+  const rows = subjects.filter((s) => s.kind !== "core").map((s) =>
     `<tr><td><a href="${base}/plugins/${s.id}/">${escapeHtml(s.id)}</a></td>` +
     `<td>${escapeHtml(s.kind)}</td>` +
     `<td>${s.release ? escapeHtml(s.release.tag) : "unreleased"}</td>` +
