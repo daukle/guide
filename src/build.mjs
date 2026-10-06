@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { gather } from "./fetch.mjs";
 import { renderMarkdown, page, escapeHtml } from "./render.mjs";
+import { checkSnippets } from "./snippets.mjs";
 
 // The site publishes at daukle.github.io/guide/, so every link is prefixed unless a
 // local build overrides it.
@@ -61,6 +62,13 @@ function titleOf(markdown, fallback) {
 
 export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = BASE } = {}) {
   const { manifest, subjects } = await gather({ token, fetchImpl, manifestUrl });
+
+  const snippets = await checkSnippets(subjects, { fetchImpl: fetchImpl ?? fetch });
+  if (snippets.problems.length) {
+    throw new Error(
+      [`${snippets.problems.length} of ${snippets.checked} quoted snippets are wrong:`,
+       ...snippets.problems.map((problem) => `  ${problem}`)].join("\n"));
+  }
 
   const missing = subjects.filter((subject) => subject.pages.length === 0);
   if (missing.length > MAX_MISSING) {
@@ -130,7 +138,8 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
   // directory beginning with an underscore.
   write(join(out, ".nojekyll"), "");
 
-  return { written: written + 1, subjects: subjects.length, missing: missing.map((s) => s.id) };
+  return { written: written + 1, subjects: subjects.length, missing: missing.map((s) => s.id),
+           snippets: snippets.checked };
 }
 
 function subjectHeader(subject, base) {
@@ -233,7 +242,8 @@ a { color:var(--accent); }
 
 async function main() {
   const result = await build({ token: process.env.GITHUB_TOKEN });
-  console.log(`wrote ${result.written} pages for ${result.subjects} repositories`);
+  console.log(`wrote ${result.written} pages for ${result.subjects} repositories, ` +
+              `and compared ${result.snippets} quoted snippets`);
   if (result.missing.length) console.warn(`no wiki yet: ${result.missing.join(", ")}`);
 }
 
