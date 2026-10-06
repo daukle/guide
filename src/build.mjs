@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { gather } from "./fetch.mjs";
@@ -8,7 +8,6 @@ import { renderMarkdown, page, escapeHtml } from "./render.mjs";
 // local build overrides it.
 const BASE = process.env.SITE_BASE ?? "/guide";
 const OUT = process.env.SITE_OUT ?? "site";
-const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
 // How many subjects may have no wiki before the build refuses. A site that
 // silently publishes with half its plugins missing looks exactly like a site
@@ -34,13 +33,25 @@ function navigation(groups, base) {
   return parts.join("");
 }
 
-function guidePages() {
-  const dir = join(ROOT, "pages");
-  return readdirSync(dir).filter((name) => name.endsWith(".md")).sort().map((name) => ({
-    name,
-    slug: name.replace(/^\d+-/, "").replace(/\.md$/, ""),
-    text: readFileSync(join(dir, name), "utf8"),
-  }));
+/**
+ * The narrative pages, which are core's wiki pages other than its index.
+ *
+ * @implNote this repository holds no content, so there is nothing to read off
+ * disk: every page on the site comes from some repository's `wiki/`. Reading a
+ * local `pages/` is what broke the site build for three runs after those four
+ * pages moved into `daukle/daukle/wiki/`, with the renderer suite still green
+ * because nothing in it called build().
+ */
+function narrativePages(subjects) {
+  const core = subjects.find((subject) => subject.kind === "core");
+  if (!core) return [];
+  return core.pages
+    .filter((wikiPage) => wikiPage.name !== "index.md")
+    .map((wikiPage) => ({
+      slug: wikiPage.name.replace(/\.md$/, ""),
+      text: wikiPage.text,
+    }))
+    .sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
 function titleOf(markdown, fallback) {
@@ -59,11 +70,17 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
       `Publishing would look like an org that small.`);
   }
 
-  const pages = guidePages();
+  const pages = narrativePages(subjects);
+  if (pages.length === 0) {
+    throw new Error(
+      "core carries no wiki page but its index, so the site would publish with an empty " +
+      "guide section and look like a tool nobody documented.");
+  }
+
   const exampleCount = subjects.reduce(
     (total, subject) => total + (subject.exampleDetails || []).length, 0);
   const groups = [
-    ["The guide", pages.map((p) => ({ href: `/guide/${p.slug}/`, label: titleOf(p.text, p.slug) }))],
+    ["The guide", pages.map((p) => ({ href: `/core/${p.slug}/`, label: titleOf(p.text, p.slug) }))],
     ["Plugins", subjects.filter((s) => !["core", "examples"].includes(s.kind)).map((s) => ({
       href: `/plugins/${s.id}/`,
       label: s.id,
@@ -77,13 +94,6 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
   const nav = navigation(groups, base);
 
   let written = 0;
-  for (const entry of pages) {
-    const { html } = renderMarkdown(entry.text);
-    write(join(out, "guide", entry.slug, "index.html"),
-          page({ title: titleOf(entry.text, entry.slug), body: html, nav, base }));
-    written += 1;
-  }
-
   for (const subject of subjects) {
     const prefix = subject.kind === "core" ? ["core"]
       : subject.kind === "examples" ? ["examples", "about"]
@@ -159,17 +169,16 @@ function examplesBody(subjects, base) {
   const without = subjects.filter((subject) => (subject.exampleDetails || []).length === 0)
     .map((subject) => subject.id);
   const note = without.length
-    ? `<p class="meta">No example yet: ${escapeHtml(without.join(", "))}. A source or a ` +
-      `dependency writer needs a second plugin to demonstrate anything, so its example is ` +
-      `cross-plugin and lives in <a href="https://github.com/daukle/examples">daukle/examples</a>.</p>`
+    ? `<p class="meta">No example, deliberately: ${escapeHtml(without.join(", "))}. ` +
+      `A plugin that registers nothing, that is demonstrated by every example using it, or ` +
+      `that produces something another toolchain consumes has nothing runnable to show on ` +
+      `its own.</p>`
     : "";
 
   return `<h1>Examples</h1>
-<p>Every example in the organization. Each one lives in the repository it demonstrates, so that
-repository's own CI breaks when the example stops working, and each carries an ABOUT.md with a
-<strong>what this cannot show</strong> section. The cross-plugin ones, which need two plugins to
-demonstrate anything, live in
-<a href="https://github.com/daukle/examples">daukle/examples</a>.</p>
+<p>Every example in the organization. Each one lives in the repository of the thing it
+demonstrates, with no exception, so that repository's own CI breaks when the example stops
+working, and each carries an ABOUT.md with a <strong>what this cannot show</strong> section.</p>
 ${sections.join("")}
 ${note}`;
 }
