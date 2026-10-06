@@ -4,6 +4,8 @@ import { pathToFileURL } from "node:url";
 import { gather } from "./fetch.mjs";
 import { renderMarkdown, page, escapeHtml } from "./render.mjs";
 import { checkSnippets } from "./snippets.mjs";
+import { expandEveryPage } from "./references.mjs";
+import { checkFreshness } from "./freshness.mjs";
 
 // The site publishes at daukle.github.io/guide/, so every link is prefixed unless a
 // local build overrides it.
@@ -63,11 +65,20 @@ function titleOf(markdown, fallback) {
 export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = BASE } = {}) {
   const { manifest, subjects } = await gather({ token, fetchImpl, manifestUrl });
 
+  // Snippets BEFORE references, because expanding a reference rewrites the page
+  // text and a fence is compared against the text as its author wrote it.
   const snippets = await checkSnippets(subjects, { fetchImpl: fetchImpl ?? fetch });
-  if (snippets.problems.length) {
+  const freshness = checkFreshness(subjects, manifestsOf(subjects));
+  const broken = [
+    ...snippets.problems,
+    ...expandEveryPage(subjects, base),
+    ...freshness.problems,
+  ];
+  if (broken.length) {
     throw new Error(
-      [`${snippets.problems.length} of ${snippets.checked} quoted snippets are wrong:`,
-       ...snippets.problems.map((problem) => `  ${problem}`)].join("\n"));
+      [`the site would publish ${broken.length} broken reference(s), ` +
+       `having compared ${snippets.checked} quoted snippets:`,
+       ...broken.map((problem) => `  ${problem}`)].join("\n"));
   }
 
   const missing = subjects.filter((subject) => subject.pages.length === 0);
@@ -133,7 +144,7 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
 
   write(join(out, "examples", "index.html"), page({
     title: "Examples",
-    body: examplesBody(subjects, base),
+    body: examplesBody(subjects, base) + freshnessBody(freshness.reports),
     nav,
     base,
   }));
@@ -151,7 +162,27 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
   write(join(out, ".nojekyll"), "");
 
   return { written: written + 1, subjects: subjects.length, missing: missing.map((s) => s.id),
-           snippets: snippets.checked };
+           snippets: snippets.checked, stale: freshness.reports };
+}
+
+/**
+ * Every example manifest in the org, which is what the freshness report reads.
+ *
+ * @implNote the text is already in hand from rendering the example pages, so
+ * this fetches nothing.
+ */
+function manifestsOf(subjects) {
+  const out = [];
+  for (const subject of subjects) {
+    for (const example of subject.exampleDetails || []) {
+      for (const file of example.contents || []) {
+        if (file.path.endsWith("daukle.toml") && file.text !== null) {
+          out.push({ where: `${example.name}/${file.path}`, text: file.text });
+        }
+      }
+    }
+  }
+  return out;
 }
 
 function subjectHeader(subject, base) {
@@ -240,6 +271,26 @@ ${blocks}
 ${rest}`;
 }
 
+/**
+ * What the examples declare, against what the org has published.
+ *
+ * @implNote on the page and not only in the build log. A report that exists
+ * where nobody looks is the failure this whole design is about, one layer up.
+ * Being behind is not wrong by itself, which is why none of this fails a build:
+ * a coordinate nothing can satisfy does, and it never reaches here.
+ */
+function freshnessBody(reports) {
+  if (reports.length === 0) {
+    return `<h2>Freshness</h2><p class="meta">Every example names a published release and ` +
+           `pins the resolver at the current tip.</p>`;
+  }
+  const items = reports.map((report) => `<li>${escapeHtml(report)}</li>`).join("");
+  return `<h2>Freshness</h2>
+<p class="meta">Not failures. An example is pinned on purpose, and being behind the newest
+release is a choice until somebody decides otherwise.</p>
+<ul>${items}</ul>`;
+}
+
 function indexBody(manifest, subjects, base) {
   const rows = subjects.filter((s) => !["core", "examples"].includes(s.kind)).map((s) =>
     `<tr><td><a href="${base}/plugins/${s.id}/">${escapeHtml(s.id)}</a></td>` +
@@ -293,6 +344,7 @@ async function main() {
   const result = await build({ token: process.env.GITHUB_TOKEN });
   console.log(`wrote ${result.written} pages for ${result.subjects} repositories, ` +
               `and compared ${result.snippets} quoted snippets`);
+  for (const stale of result.stale) console.warn(`stale: ${stale}`);
   if (result.missing.length) console.warn(`no wiki yet: ${result.missing.join(", ")}`);
 }
 
