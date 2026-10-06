@@ -101,6 +101,46 @@ test("the examples index names every example and the repository that owns it", a
   assert.match(examples, /the repository of the thing it\ndemonstrates/);
 });
 
+test("an example gets a page carrying its prose and every file it can show", async () => {
+  const manifest = manifestFixture();
+  manifest.plugins[0].examples = [{
+    name: "java-hello-jar",
+    files: ["ABOUT.md", "daukle.toml", "src/Main.java", "needs-tools"],
+  }];
+  const files = {
+    ...FILES,
+    "daukle/java/main/examples/java-hello-jar/daukle.toml": 'project = "hello"\n',
+    "daukle/java/main/examples/java-hello-jar/src/Main.java": "class Main {}\n",
+  };
+  const { read } = await buildInto(manifest, files);
+  const example = read("examples", "java-hello-jar", "index.html");
+
+  assert.match(example, /Compiles and jars a program\./);
+  assert.match(example, /<h3 id="daukle\.toml">daukle\.toml<\/h3>/);
+  assert.match(example, /<pre><code class="language-toml">project = &quot;hello&quot;/);
+  assert.match(example, /<pre><code class="language-java">class Main \{\}/);
+  // ABOUT.md is the page's prose, not one of the files it lists.
+  assert.doesNotMatch(example, /<h3 id="ABOUT\.md">/);
+});
+
+test("a file with no known extension is listed by name, never guessed at", async () => {
+  // daukle-wrapper-bootstrap ships an extensionless `daukle` shell script, and
+  // an expected/ tree may hold anything at all.
+  const manifest = manifestFixture();
+  manifest.plugins[0].examples = [{ name: "java-hello-jar", files: ["ABOUT.md", "needs-tools"] }];
+  const { read } = await buildInto(manifest);
+  const example = read("examples", "java-hello-jar", "index.html");
+  assert.match(example, /Not shown here: <a href="[^"]*\/needs-tools">needs-tools<\/a>/);
+  assert.doesNotMatch(example, /<h3 id="needs-tools">/);
+});
+
+test("the examples index links the rendered page, not GitHub", async () => {
+  const { read } = await buildInto(manifestFixture());
+  const index = read("examples", "index.html");
+  assert.match(index, /<a href="\/guide\/examples\/java-hello-jar\/">java-hello-jar<\/a>/);
+  assert.doesNotMatch(index, /<td><a href="https:\/\/github\.com[^"]*">java-hello-jar/);
+});
+
 test("an examples list of plain names reads the same as one carrying files", async () => {
   // The manifest and this build are published separately, so a site build meets
   // whichever shape the manifest it fetched happens to carry.
