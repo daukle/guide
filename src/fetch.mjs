@@ -78,9 +78,22 @@ export function summarise(about) {
   return "";
 }
 
+/**
+ * The manifest's examples, as `{ name, files }` whichever shape it carries.
+ *
+ * @implNote the field was a list of names before the manifest learned to record
+ * each example's files, and a published manifest is read by a site build that
+ * may be older or newer than it. Normalising here is what lets the two change on
+ * their own schedules instead of in one synchronised push.
+ */
+export function normaliseExamples(subject) {
+  return (subject.examples || []).map(
+    (example) => (typeof example === "string" ? { name: example, files: [] } : example));
+}
+
 async function readExamples(subject, options) {
   const out = [];
-  for (const name of subject.examples || []) {
+  for (const { name, files } of normaliseExamples(subject)) {
     // An example lives in the plugin's OWN repository so that plugin's CI
     // breaks when it stops working. This only indexes them; nothing is copied
     // here and nothing is re-run.
@@ -93,6 +106,7 @@ async function readExamples(subject, options) {
       { headers: { "user-agent": "daukle-guide" } });
     out.push({
       name,
+      files: files || [],
       url: `https://github.com/${subject.repo}/tree/${subject.defaultBranch}/${prefix}${name}`,
       summary: about.ok ? summarise(await about.text()) : "",
     });

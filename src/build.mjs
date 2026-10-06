@@ -137,9 +137,8 @@ function subjectHeader(subject, base) {
   const release = subject.release
     ? `<code>${escapeHtml(subject.release.tag)}</code>`
     : "<em>unreleased</em>";
-  const examples = (subject.examples || []).length
-    ? ` &middot; ${subject.examples.length} example${subject.examples.length === 1 ? "" : "s"}`
-    : "";
+  const count = (subject.exampleDetails || []).length;
+  const examples = count ? ` &middot; ${count} example${count === 1 ? "" : "s"}` : "";
   return `<p class="meta"><span class="kind">${escapeHtml(subject.kind)}</span> &middot; ` +
          `<a href="https://github.com/${subject.repo}">${escapeHtml(subject.repo)}</a> &middot; ` +
          `${release}${examples}</p>`;
@@ -188,7 +187,7 @@ function indexBody(manifest, subjects, base) {
     `<tr><td><a href="${base}/plugins/${s.id}/">${escapeHtml(s.id)}</a></td>` +
     `<td>${escapeHtml(s.kind)}</td>` +
     `<td>${s.release ? escapeHtml(s.release.tag) : "unreleased"}</td>` +
-    `<td>${(s.examples || []).length || "none"}</td></tr>`).join("");
+    `<td>${(s.exampleDetails || []).length || "none"}</td></tr>`).join("");
   const generated = manifest.generatedAt
     ? `<p class="meta">Manifest generated ${escapeHtml(manifest.generatedAt)}.</p>` : "";
   return `<h1>daukle</h1>

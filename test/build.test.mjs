@@ -101,6 +101,19 @@ test("the examples index names every example and the repository that owns it", a
   assert.match(examples, /the repository of the thing it\ndemonstrates/);
 });
 
+test("an examples list of plain names reads the same as one carrying files", async () => {
+  // The manifest and this build are published separately, so a site build meets
+  // whichever shape the manifest it fetched happens to carry.
+  const names = manifestFixture();
+  const withFiles = manifestFixture();
+  withFiles.core.examples = [{ name: "daukle-local-plugin", files: ["ABOUT.md", "daukle.toml"] }];
+  withFiles.plugins[0].examples = [{ name: "java-hello-jar", files: ["ABOUT.md"] }];
+
+  const [a, b] = await Promise.all([buildInto(names), buildInto(withFiles)]);
+  assert.equal(a.read("examples", "index.html"), b.read("examples", "index.html"));
+  assert.equal(a.read("index.html"), b.read("index.html"));
+});
+
 test("nothing the build writes points readers at daukle\\/examples", async () => {
   // Every example now lives in the repository of the thing it demonstrates, so a
   // page still routing readers to the old central repository is a lie the moment
