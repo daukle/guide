@@ -30,15 +30,24 @@ GITHUB_TOKEN=... npm run docs      # writes site/
 `wiki/`, the build fails rather than publishing: a site missing half its plugins looks exactly like
 a site for an org half the size.
 
-## Why the four pages are here and not in a wiki
+## Why the pages are leaving, and where they are going
+
+**They ARE in a wiki now: the wiki of the repository each one is about.** This repository used to
+hold them because the snippet check below only works where the pages and the files they quote sit
+together, and that reason stopped applying once every repository gained a `wiki/`. Two of the four
+have moved into `daukle/daukle/wiki/` beside the examples they quote; the remaining two move with
+their examples, into `daukle/java` and `daukle/npm`. When the last one goes this repository holds no
+content at all and is only the build that renders the organization.
 
 **Every fenced block on a page that names a file is checked against that file, byte for byte, in
 CI.** A snippet copied into prose is a second source of truth, and a second source of truth drifts.
-The suite fails with the diff when it does.
+The suite fails with the diff when it does. **That check does not yet follow a page into another
+repository**, which is the one thing this move gives up for now: it is the site builder's job, and
+until it exists a moved page's snippets are verified when they move and not after.
 
-That is also why the site is generated from markdown kept in each repository rather than written
-into GitHub's own wiki feature: a wiki is a separate git repo CI does not reach, so every snippet in
-it would be an unexercised claim.
+That a page lives in a repository rather than in GitHub's own wiki feature is a separate decision
+and it stands: that wiki is a separate git repo CI does not reach, so every snippet in it would be
+an unexercised claim.
 
 The suite asserts three things on three runners:
 
