@@ -91,6 +91,46 @@ export function normaliseExamples(subject) {
     (example) => (typeof example === "string" ? { name: example, files: [] } : example));
 }
 
+/**
+ * Which files the site shows inline, by extension.
+ *
+ * @implNote by extension and never by content: `daukle-wrapper-bootstrap` ships
+ * a `daukle` shell script and a `daukle.ps1` beside a `.daukle/wrapper.toml`,
+ * and an `expected/` tree may hold anything at all. A file with no language here
+ * is listed by name with a link rather than guessed at.
+ */
+const LANGUAGES = {
+  toml: "toml", lua: "lua", json: "json", c: "c", h: "c", cpp: "cpp", java: "java",
+  mjs: "javascript", js: "javascript", sh: "sh", ps1: "powershell", md: "markdown",
+  gradle: "groovy", txt: "", yml: "yaml", yaml: "yaml",
+};
+
+export function languageOf(path) {
+  const base = path.slice(path.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return null;
+  const extension = base.slice(dot + 1).toLowerCase();
+  return extension in LANGUAGES ? LANGUAGES[extension] : null;
+}
+
+async function readExampleFiles(root, files, options) {
+  const out = [];
+  for (const path of files) {
+    // ABOUT.md is the page's own prose, shown above rather than as one of the
+    // files it describes.
+    if (path === "ABOUT.md") continue;
+    const language = languageOf(path);
+    if (language === null) {
+      out.push({ path, language: null, text: null });
+      continue;
+    }
+    const response = await options.fetchImpl(`${root}/${path}`,
+      { headers: { "user-agent": "daukle-guide" } });
+    out.push({ path, language, text: response.ok ? await response.text() : null });
+  }
+  return out;
+}
+
 async function readExamples(subject, options) {
   const out = [];
   for (const { name, files } of normaliseExamples(subject)) {
@@ -100,15 +140,18 @@ async function readExamples(subject, options) {
     // daukle/examples keeps its examples at the ROOT; everywhere else they are
     // under examples/. The manifest records the names either way.
     const prefix = subject.kind === "examples" ? "" : "examples/";
-    const about = await options.fetchImpl(
-      `https://raw.githubusercontent.com/${subject.repo}/${subject.defaultBranch}` +
-      `/${prefix}${name}/ABOUT.md`,
+    const root = `https://raw.githubusercontent.com/${subject.repo}/${subject.defaultBranch}` +
+                 `/${prefix}${name}`;
+    const about = await options.fetchImpl(`${root}/ABOUT.md`,
       { headers: { "user-agent": "daukle-guide" } });
+    const aboutText = about.ok ? await about.text() : "";
     out.push({
       name,
-      files: files || [],
+      repo: subject.repo,
+      about: aboutText,
+      contents: await readExampleFiles(root, files || [], options),
       url: `https://github.com/${subject.repo}/tree/${subject.defaultBranch}/${prefix}${name}`,
-      summary: about.ok ? summarise(await about.text()) : "",
+      summary: aboutText ? summarise(aboutText) : "",
     });
   }
   return out;
