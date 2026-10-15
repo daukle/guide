@@ -103,7 +103,7 @@ export async function build({ token, fetchImpl, manifestUrl, out = OUT, base = B
     ["Plugins", subjects.filter((s) => s.kind !== "core").map((s) => ({
       href: `/plugins/${s.id}/`,
       label: s.id,
-      note: s.kind,
+      note: kindLabel(s),
     }))],
     ["Core", subjects.filter((s) => s.kind === "core").map((s) => ({
       href: `/core/`, label: s.id, note: s.release ? s.release.tag : "unreleased",
@@ -183,13 +183,18 @@ function manifestsOf(subjects) {
   return out;
 }
 
+// A plugin may declare more than one kind; `kind` stays the first for every comparison.
+function kindLabel(subject) {
+  return (subject.kinds || [subject.kind]).join(" + ");
+}
+
 function subjectHeader(subject, base) {
   const release = subject.release
     ? `<code>${escapeHtml(subject.release.tag)}</code>`
     : "<em>unreleased</em>";
   const count = (subject.exampleDetails || []).length;
   const examples = count ? ` &middot; ${count} example${count === 1 ? "" : "s"}` : "";
-  return `<p class="meta"><span class="kind">${escapeHtml(subject.kind)}</span> &middot; ` +
+  return `<p class="meta"><span class="kind">${escapeHtml(kindLabel(subject))}</span> &middot; ` +
          `<a href="https://github.com/${subject.repo}">${escapeHtml(subject.repo)}</a> &middot; ` +
          `${release}${examples}</p>`;
 }
@@ -292,7 +297,7 @@ release is a choice until somebody decides otherwise.</p>
 function indexBody(manifest, subjects, base) {
   const rows = subjects.filter((s) => s.kind !== "core").map((s) =>
     `<tr><td><a href="${base}/plugins/${s.id}/">${escapeHtml(s.id)}</a></td>` +
-    `<td>${escapeHtml(s.kind)}</td>` +
+    `<td>${escapeHtml(kindLabel(s))}</td>` +
     `<td>${s.release ? escapeHtml(s.release.tag) : "unreleased"}</td>` +
     `<td>${(s.exampleDetails || []).length || "none"}</td></tr>`).join("");
   const generated = manifest.generatedAt

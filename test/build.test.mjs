@@ -163,3 +163,14 @@ test("nothing the build writes points readers at daukle\\/examples", async () =>
     assert.doesNotMatch(read(page), /github\.com\/daukle\/examples/);
   }
 });
+
+test("a plugin declaring two kinds shows both, on its page and in the plugins table", async () => {
+  const manifest = manifestFixture();
+  manifest.plugins.push({ ...subject("github", "source"), kinds: ["source", "publisher"] });
+  const files = { ...FILES, "daukle/github/main/wiki/index.md": "# github\n\nBoth.\n" };
+  const { read } = await buildInto(manifest, files);
+  assert.match(read("plugins", "github", "index.html"),
+               /<span class="kind">source \+ publisher<\/span>/);
+  assert.match(read("index.html"), /<td>source \+ publisher<\/td>/);
+  assert.match(read("index.html"), /<td>toolchain<\/td>/);
+});
