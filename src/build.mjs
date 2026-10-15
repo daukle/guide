@@ -185,7 +185,10 @@ function manifestsOf(subjects) {
 
 // A plugin may declare more than one kind; `kind` stays the first for every comparison.
 function kindLabel(subject) {
-  return (subject.kinds || [subject.kind]).join(" + ");
+  const kinds = (subject.kinds || [subject.kind]).join(" + ");
+  const modules = (subject.modules || [])
+    .map((module) => `module ${module.name} (${(module.kinds || [module.kind]).join(" + ")})`);
+  return [kinds, ...modules].join(", ");
 }
 
 function subjectHeader(subject, base) {

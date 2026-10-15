@@ -174,3 +174,17 @@ test("a plugin declaring two kinds shows both, on its page and in the plugins ta
   assert.match(read("index.html"), /<td>source \+ publisher<\/td>/);
   assert.match(read("index.html"), /<td>toolchain<\/td>/);
 });
+
+test("a plugin's modules are shown beside its kinds", async () => {
+  const manifest = manifestFixture();
+  manifest.plugins.push({
+    ...subject("cmake", "toolchain"),
+    kinds: ["toolchain"],
+    modules: [{ name: "deps", kind: "language", kinds: ["language"], uses: ["region"] }],
+  });
+  const files = { ...FILES, "daukle/cmake/main/wiki/index.md": "# cmake\n\nModules.\n" };
+  const { read } = await buildInto(manifest, files);
+  assert.match(read("plugins", "cmake", "index.html"),
+               /<span class="kind">toolchain, module deps \(language\)<\/span>/);
+  assert.match(read("index.html"), /<td>toolchain, module deps \(language\)<\/td>/);
+});
